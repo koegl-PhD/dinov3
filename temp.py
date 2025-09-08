@@ -36,8 +36,9 @@ if __name__ == "__main__":
     # cat_image_resized = resize_transform(cat_image)
     # cat_image_resized_norm = TF.normalize(
     #     cat_image_resized, IMAGENET_MEAN, IMAGENET_STD)
-    cat_tensor = torch.load(r"/home/fryderyk/Downloads/tensor.pt")
+    cat1_tensor = torch.load(r"/home/fryderyk/Downloads/tensor.pt")
+    cat2_tensor = torch.load(r"/home/fryderyk/Downloads/cat2_feat.pt")
 
-    app = vis.build_app(cat_tensor)
+    app = vis.build_app(cat1_tensor, cat2_tensor)
     app.run(debug=True, port=8050)
     x = 0
