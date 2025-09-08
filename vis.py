@@ -6,6 +6,10 @@ from dash import Dash, dcc, html, Input, Output, no_update
 import plotly.graph_objects as go
 from typing import List, Tuple
 from dash import Dash, dcc, html, Input, Output, no_update, ctx
+from typing import Tuple
+import numpy as np
+from dash import Input, Output, no_update, ctx
+import plotly.graph_objects as go
 
 
 def normalize_features_torch(feat: torch.Tensor) -> torch.Tensor:
@@ -37,16 +41,22 @@ def map_coords(y: int, x: int, src_hw: Tuple[int, int], dst_hw: Tuple[int, int])
 
 
 def make_figure(sim: np.ndarray, x: int, y: int, total_min: float, total_max: float) -> go.Figure:
-    """Create similarity heatmap with the selected pixel highlighted."""
+    """Similarity heatmap; if x<0 or y<0, no marker is drawn."""
     H, W = sim.shape
     heat = go.Heatmap(
         z=sim, zmin=total_min, zmax=total_max,
-        colorscale="magma",  # magma-like as in your screenshot
+        colorscale="magma",
         colorbar=dict(title="cosine sim"),
         hovertemplate="x:%{x} y:%{y}<br>sim:%{z:.3f}<extra></extra>",
     )
-
     fig = go.Figure(data=[heat])
+    if 0 <= x < W and 0 <= y < H:
+        fig.add_trace(go.Scatter(
+            x=[x], y=[y], mode="markers",
+            marker=dict(size=10, symbol="x", line=dict(
+                width=2), color="black"),
+            hoverinfo="skip",
+        ))
     fig.update_layout(
         xaxis=dict(range=[-0.5, W - 0.5], constrain="domain",
                    scaleanchor="y", scaleratio=1, autorange=False),
@@ -99,37 +109,42 @@ def build_app(f1: torch.Tensor, f2: torch.Tensor) -> Dash:
         Input("sim-b", "hoverData"),
         prevent_initial_call=False,
     )
-    def on_hover(hoverA, hoverB):
-        nonlocal f1n, f2n
+    def on_hover_both(hoverA, hoverB) -> Tuple[go.Figure, str, go.Figure, str]:
+        """Hover works in BOTH images: pick ref from the hovered image, recolor both."""
         H1, W1 = f1n.shape[1:]
         H2, W2 = f2n.shape[1:]
+        trig = ctx.triggered_id
 
-        if hoverA:  # pick ref from image 1
-            pt = hoverA["points"][0]
-            x, y = int(pt["x"]), int(pt["y"])
+        if trig == "sim-a" and hoverA:
+            x, y = int(hoverA["points"][0]["x"]), int(hoverA["points"][0]["y"])
             ref_vec = f1n[:, y, x]
-            sim1 = cosine_map_np(f1n, y, x)
-            sim2 = (np.tensordot(ref_vec, f2n, axes=(0, 0)) + 1) * 0.5
+            simA = (np.tensordot(ref_vec, f1n, axes=(0, 0)) + 1) * 0.5
+            simB = (np.tensordot(ref_vec, f2n, axes=(0, 0)) + 1) * 0.5
 
-            total_min = np.minimum(sim1.min(), sim2.min())
-            total_max = np.maximum(sim1.max(), sim2.max())
+            total_min = np.minimum(simA.min(), simB.min())
+            total_max = np.maximum(simA.max(), simB.max())
 
-            return (make_figure(sim1, x, y, total_min, total_max),
-                    f"ref from img1 (x={x},y={y})",
-                    make_figure(sim2, W2 // 2, H2 // 2, total_min, total_max),
-                    "updated by img1")
+            return (
+                make_figure(simA, x, y, total_min,
+                            total_max), f"ref: img1 (x={x}, y={y})",
+                make_figure(simB, -1, -1, total_min,
+                            total_max), "updated by img1",
+            )
 
-        if hoverB:  # pick ref from image 2
-            pt = hoverB["points"][0]
-            x, y = int(pt["x"]), int(pt["y"])
+        if trig == "sim-b" and hoverB:
+            x, y = int(hoverB["points"][0]["x"]), int(hoverB["points"][0]["y"])
             ref_vec = f2n[:, y, x]
-            sim2 = cosine_map_np(f2n, y, x)
-            sim1 = (np.tensordot(ref_vec, f1n, axes=(0, 0)) + 1) * 0.5
+            simB = (np.tensordot(ref_vec, f2n, axes=(0, 0)) + 1) * 0.5
+            simA = (np.tensordot(ref_vec, f1n, axes=(0, 0)) + 1) * 0.5
 
-            total_min = np.minimum(sim1.min(), sim2.min())
-            total_max = np.maximum(sim1.max(), sim2.max())
-            return (make_figure(sim1, W1 // 2, H1 // 2, total_min, total_max), "updated by img2",
-                    make_figure(sim2, x, y, total_min, total_max), f"ref from img2 (x={x},y={y})")
+            total_min = np.minimum(simA.min(), simB.min())
+            total_max = np.maximum(simA.max(), simB.max())
+            return (
+                make_figure(simA, -1, -1, total_min,
+                            total_max), "updated by img2",
+                make_figure(simB, x, y, total_min,
+                            total_max), f"ref: img2 (x={x}, y={y})",
+            )
 
         return no_update, no_update, no_update, no_update
 
