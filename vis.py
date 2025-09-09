@@ -35,26 +35,40 @@ def cosine_map_fast(f_norm: np.ndarray, ref_vec: np.ndarray) -> np.ndarray:
 
 
 def init_figure(sim: np.ndarray, title: str) -> go.Figure:
-    """Static figure scaffold: heatmap + an (initially hidden) marker trace."""
     H, W = sim.shape
     fig = go.Figure([
         go.Heatmap(
-            z=sim, zmin=float(sim.min()), zmax=float(sim.max()), colorscale="magma",
+            z=sim,
+            zmin=float(sim.min()),
+            zmax=float(sim.max()),
+            colorscale="magma",
             colorbar=dict(title="cosine sim"),
-            hovertemplate="x:%{x} y:%{y}<br>sim:%{z:.3f}<extra></extra>",
+            hovertemplate="<extra></extra>",  # keep events, no text
+            hoverlabel=dict(                  # make label + pointer invisible
+                bgcolor="rgba(0,0,0,0)",
+                bordercolor="rgba(0,0,0,0)",
+                font=dict(color="rgba(0,0,0,0)"),
+                namelength=0,
+                align="left",
+            ),
         ),
-        go.Scatter(x=[None], y=[None], mode="markers",
-                   marker=dict(size=10, symbol="x", line=dict(
-                       width=2), color="black"),
-                   hoverinfo="skip")
+        go.Scatter(
+            x=[None], y=[None], mode="markers",
+            marker=dict(size=10, symbol="x", line=dict(
+                width=2), color="black"),
+            hoverinfo="skip", hovertemplate=None, showlegend=False,
+        )
     ])
     fig.update_layout(
         title=title,
-        xaxis=dict(range=[-0.5, W - 0.5], constrain="domain", scaleanchor="y",
-                   scaleratio=1, autorange=False),
-        yaxis=dict(range=[H - 0.5, -0.5], autorange=False),
+        xaxis=dict(range=[-0.5, W - 0.5], constrain="domain",
+                   scaleanchor="y", scaleratio=1, autorange=False,
+                   showspikes=False),    # no axis spike lines
+        yaxis=dict(range=[H - 0.5, -0.5], autorange=False,
+                   showspikes=False),
         margin=dict(l=10, r=10, t=30, b=10),
-        uirevision="lock",  # prevents relayout on updates
+        uirevision="lock",
+        hovermode="closest",
     )
     return fig
 
@@ -124,7 +138,7 @@ def build_app(f1: torch.Tensor, f2: torch.Tensor) -> Dash:
             pB["data"][0]["zmax"] = float(simB.max())
             pB["data"][1]["x"] = [None]
             pB["data"][1]["y"] = [None]
-            return pA, f"ref: img1 (x={x}, y={y})", pB, "updated by img1"
+            return pA, f"ref: img1 (x={x}, y={y})", pB, ""
 
         if trig == "sim-b" and hoverB:
             x, y = int(hoverB["points"][0]["x"]), int(hoverB["points"][0]["y"])
@@ -143,7 +157,7 @@ def build_app(f1: torch.Tensor, f2: torch.Tensor) -> Dash:
             pB["data"][0]["zmax"] = float(simB.max())
             pB["data"][1]["x"] = [x]
             pB["data"][1]["y"] = [y]
-            return pA, "", pB, "ref: img2"
+            return pA, "", pB, ""
 
         return no_update, no_update, no_update, no_update
 
