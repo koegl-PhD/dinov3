@@ -32,13 +32,17 @@ def resize_transform(
 
 
 if __name__ == "__main__":
-    # cat_image = Image.open(r"/home/fryderyk/Downloads/cat.jpg").convert("RGB")
-    # cat_image_resized = resize_transform(cat_image)
-    # cat_image_resized_norm = TF.normalize(
-    #     cat_image_resized, IMAGENET_MEAN, IMAGENET_STD)
-    cat1_tensor = torch.load(r"/home/fryderyk/Downloads/tensor.pt")
-    cat2_tensor = torch.load(r"/home/fryderyk/Downloads/cat2_feat.pt")
+    image_1 = Image.open(
+        r"/home/fryderyk/Pictures/Screenshots/im1.png").convert("RGB")
+    image_1_resized = resize_transform(image_1)
 
-    app = vis.build_app(cat1_tensor, cat2_tensor)
+    image_2 = Image.open(
+        r"/home/fryderyk/Pictures/Screenshots/im2.png").convert("RGB")
+    image_2_resized = resize_transform(image_2)
+
+    image_1_feat = torch.load(r"/home/fryderyk/Downloads/im1_feat.pt")
+    image_2_feat = torch.load(r"/home/fryderyk/Downloads/im2_feat.pt")
+
+    app = vis.build_app(image_1_feat, image_2_feat)
     app.run(debug=True, port=8050)
     x = 0
