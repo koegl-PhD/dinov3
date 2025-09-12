@@ -11,7 +11,7 @@ import torch
 import torch.nn.init
 from torch import Tensor, nn
 
-from dinov3.layers import LayerScale, Mlp, PatchEmbed, RMSNorm, RopePositionEmbedding, SelfAttentionBlock, SwiGLUFFN
+from dinov3.layers import LayerScale, Mlp, PatchEmbed, PatchEmbed3D, RMSNorm, RopePositionEmbedding, SelfAttentionBlock, SwiGLUFFN
 from dinov3.utils import named_apply
 
 logger = logging.getLogger("dinov3")
@@ -45,7 +45,7 @@ def init_weights_vit(module: nn.Module, name: str = ""):
         if hasattr(module, "bias_mask") and module.bias_mask is not None:
             o = module.out_features
             module.bias_mask.fill_(1)
-            module.bias_mask[o // 3 : 2 * o // 3].fill_(0)
+            module.bias_mask[o // 3: 2 * o // 3].fill_(0)
     if isinstance(module, nn.LayerNorm):
         module.reset_parameters()
     if isinstance(module, LayerScale):
@@ -66,7 +66,8 @@ class DinoVisionTransformer(nn.Module):
         pos_embed_rope_base: float = 100.0,
         pos_embed_rope_min_period: float | None = None,
         pos_embed_rope_max_period: float | None = None,
-        pos_embed_rope_normalize_coords: Literal["min", "max", "separate"] = "separate",
+        pos_embed_rope_normalize_coords: Literal["min",
+                                                 "max", "separate"] = "separate",
         pos_embed_rope_shift_coords: float | None = None,
         pos_embed_rope_jitter_coords: float | None = None,
         pos_embed_rope_rescale_coords: float | None = None,
@@ -96,7 +97,8 @@ class DinoVisionTransformer(nn.Module):
 
         norm_layer_cls = norm_layer_dict[norm_layer]
 
-        self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
+        # num_features for consistency with other models
+        self.num_features = self.embed_dim = embed_dim
         self.n_blocks = depth
         self.num_heads = num_heads
         self.patch_size = patch_size
@@ -109,17 +111,25 @@ class DinoVisionTransformer(nn.Module):
             flatten_embedding=False,
         )
 
-        self.cls_token = nn.Parameter(torch.empty(1, 1, embed_dim, device=device))
+        self.cls_token = nn.Parameter(
+            torch.empty(1, 1, embed_dim, device=device))
         self.n_storage_tokens = n_storage_tokens
         if self.n_storage_tokens > 0:
-            self.storage_tokens = nn.Parameter(torch.empty(1, n_storage_tokens, embed_dim, device=device))
+            self.storage_tokens = nn.Parameter(torch.empty(
+                1, n_storage_tokens, embed_dim, device=device))
         logger.info(f"using base={pos_embed_rope_base} for rope new")
-        logger.info(f"using min_period={pos_embed_rope_min_period} for rope new")
-        logger.info(f"using max_period={pos_embed_rope_max_period} for rope new")
-        logger.info(f"using normalize_coords={pos_embed_rope_normalize_coords} for rope new")
-        logger.info(f"using shift_coords={pos_embed_rope_shift_coords} for rope new")
-        logger.info(f"using rescale_coords={pos_embed_rope_rescale_coords} for rope new")
-        logger.info(f"using jitter_coords={pos_embed_rope_jitter_coords} for rope new")
+        logger.info(
+            f"using min_period={pos_embed_rope_min_period} for rope new")
+        logger.info(
+            f"using max_period={pos_embed_rope_max_period} for rope new")
+        logger.info(
+            f"using normalize_coords={pos_embed_rope_normalize_coords} for rope new")
+        logger.info(
+            f"using shift_coords={pos_embed_rope_shift_coords} for rope new")
+        logger.info(
+            f"using rescale_coords={pos_embed_rope_rescale_coords} for rope new")
+        logger.info(
+            f"using jitter_coords={pos_embed_rope_jitter_coords} for rope new")
         logger.info(f"using dtype={pos_embed_rope_dtype} for rope new")
         self.rope_embed = RopePositionEmbedding(
             embed_dim=embed_dim,
@@ -177,7 +187,8 @@ class DinoVisionTransformer(nn.Module):
         else:
             self.local_cls_norm = None
         self.head = nn.Identity()
-        self.mask_token = nn.Parameter(torch.empty(1, embed_dim, device=device))
+        self.mask_token = nn.Parameter(
+            torch.empty(1, embed_dim, device=device))
 
     def init_weights(self):
         self.rope_embed._init_weights()
@@ -193,7 +204,8 @@ class DinoVisionTransformer(nn.Module):
         x = x.flatten(1, 2)
 
         if masks is not None:
-            x = torch.where(masks.unsqueeze(-1), self.mask_token.to(x.dtype).unsqueeze(0), x)
+            x = torch.where(masks.unsqueeze(-1),
+                            self.mask_token.to(x.dtype).unsqueeze(0), x)
             cls_token = self.cls_token
         else:
             cls_token = self.cls_token + 0 * self.mask_token
@@ -239,16 +251,19 @@ class DinoVisionTransformer(nn.Module):
                 if self.untie_global_and_local_cls_norm and self.training and idx == 1:
                     # Assume second entry of list corresponds to local crops.
                     # We only ever apply this during training.
-                    x_norm_cls_reg = self.local_cls_norm(x[:, : self.n_storage_tokens + 1])
+                    x_norm_cls_reg = self.local_cls_norm(
+                        x[:, : self.n_storage_tokens + 1])
                 elif self.untie_cls_and_patch_norms:
-                    x_norm_cls_reg = self.cls_norm(x[:, : self.n_storage_tokens + 1])
+                    x_norm_cls_reg = self.cls_norm(
+                        x[:, : self.n_storage_tokens + 1])
                 else:
-                    x_norm_cls_reg = self.norm(x[:, : self.n_storage_tokens + 1])
-                x_norm_patch = self.norm(x[:, self.n_storage_tokens + 1 :])
+                    x_norm_cls_reg = self.norm(
+                        x[:, : self.n_storage_tokens + 1])
+                x_norm_patch = self.norm(x[:, self.n_storage_tokens + 1:])
             else:
                 x_norm = self.norm(x)
                 x_norm_cls_reg = x_norm[:, : self.n_storage_tokens + 1]
-                x_norm_patch = x_norm[:, self.n_storage_tokens + 1 :]
+                x_norm_patch = x_norm[:, self.n_storage_tokens + 1:]
             output.append(
                 {
                     "x_norm_clstoken": x_norm_cls_reg[:, 0],
@@ -270,7 +285,8 @@ class DinoVisionTransformer(nn.Module):
         x, (H, W) = self.prepare_tokens_with_masks(x)
         # If n is an int, take the n last blocks. If it's a list, take them
         output, total_block_len = [], len(self.blocks)
-        blocks_to_take = range(total_block_len - n, total_block_len) if isinstance(n, int) else n
+        blocks_to_take = range(total_block_len - n,
+                               total_block_len) if isinstance(n, int) else n
         for i, blk in enumerate(self.blocks):
             if self.rope_embed is not None:
                 rope_sincos = self.rope_embed(H=H, W=W)
@@ -279,7 +295,8 @@ class DinoVisionTransformer(nn.Module):
             x = blk(x, rope_sincos)
             if i in blocks_to_take:
                 output.append(x)
-        assert len(output) == len(blocks_to_take), f"only {len(output)} / {len(blocks_to_take)} blocks found"
+        assert len(output) == len(
+            blocks_to_take), f"only {len(output)} / {len(blocks_to_take)} blocks found"
         return output
 
     def get_intermediate_layers(
@@ -297,19 +314,24 @@ class DinoVisionTransformer(nn.Module):
             outputs_normed = []
             for out in outputs:
                 if self.untie_cls_and_patch_norms:
-                    x_norm_cls_reg = self.cls_norm(out[:, : self.n_storage_tokens + 1])
-                    x_norm_patch = self.norm(out[:, self.n_storage_tokens + 1 :])
-                    outputs_normed.append(torch.cat((x_norm_cls_reg, x_norm_patch), dim=1))
+                    x_norm_cls_reg = self.cls_norm(
+                        out[:, : self.n_storage_tokens + 1])
+                    x_norm_patch = self.norm(
+                        out[:, self.n_storage_tokens + 1:])
+                    outputs_normed.append(
+                        torch.cat((x_norm_cls_reg, x_norm_patch), dim=1))
                 else:
                     outputs_normed.append(self.norm(out))
             outputs = outputs_normed
         class_tokens = [out[:, 0] for out in outputs]
-        extra_tokens = [out[:, 1 : self.n_storage_tokens + 1] for out in outputs]
-        outputs = [out[:, self.n_storage_tokens + 1 :] for out in outputs]
+        extra_tokens = [out[:, 1: self.n_storage_tokens + 1]
+                        for out in outputs]
+        outputs = [out[:, self.n_storage_tokens + 1:] for out in outputs]
         if reshape:
             B, _, h, w = x.shape
             outputs = [
-                out.reshape(B, h // self.patch_size, w // self.patch_size, -1).permute(0, 3, 1, 2).contiguous()
+                out.reshape(B, h // self.patch_size, w //
+                            self.patch_size, -1).permute(0, 3, 1, 2).contiguous()
                 for out in outputs
             ]
         if not return_class_token and not return_extra_tokens:
