@@ -288,6 +288,7 @@ class DinoVisionTransformer(nn.Module):
         blocks_to_take = range(total_block_len - n,
                                total_block_len) if isinstance(n, int) else n
         for i, blk in enumerate(self.blocks):
+            self.rope_embed = None
             if self.rope_embed is not None:
                 rope_sincos = self.rope_embed(H=H, W=W)
             else:
