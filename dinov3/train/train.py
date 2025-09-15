@@ -79,7 +79,7 @@ For python-based LazyConfig, use "path.key=value".
     )
     parser.add_argument(
         "--output-dir",
-        default="/home/fryderyk/Documents/code/dinov3/output",
+        default="/home/koeglf/Documents/code/dinov3/outputs",
         type=str,
         help="Path to save logs and checkpoints.",
     )

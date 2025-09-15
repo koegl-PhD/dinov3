@@ -4,7 +4,7 @@ MODEL:
   META_ARCHITECTURE: SSLMetaArch
   DEVICE: cuda
   # IMPORTANT: Replace this with the actual path to your downloaded DINOv3 pre-trained weights
-  WEIGHTS: '/home/fryderyk/Downloads/dinov3_models/dinov3_vit-s-16.pth'
+  WEIGHTS: '/home/koeglf/Downloads/dinov3_models/dinov3_vits16.pth'
   DTYPE: float32
 
 compute_precision:
@@ -29,8 +29,8 @@ gram:
 
 train:
   batch_size_per_gpu: 1 # Adjust based on your GPU memory
-  dataset_path: "/data/dino_data"
-  output_dir: "/home/fryderyk/Documents/code/dinov3/output_finetune"
+  dataset_path: "/home/koeglf/Downloads/data_dino"
+  output_dir: "/home/koeglf/Documents/code/dinov3/outputs"
   saveckp_freq: 10 # Save checkpoints every 10 epochs
   seed: 0
   num_workers: 4
