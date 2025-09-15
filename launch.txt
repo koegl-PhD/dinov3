@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: DINOv3 Fine-tuning",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/dinov3/train/train.py",
+            "args": [
+                "--config-file",
+                "dinov3/configs/train/dinov3_vitl16_finetune_custom.yaml"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "CUDA_LAUNCH_BLOCKING": "1"
+            }
+        }
+    ]
+}
