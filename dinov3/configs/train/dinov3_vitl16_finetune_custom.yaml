@@ -1,0 +1,65 @@
+# Custom fine-tuning configuration for DINOv3 ViT-L/16
+
+MODEL:
+  META_ARCHITECTURE: SSLMetaArch
+  DEVICE: cuda
+  # IMPORTANT: Replace this with the actual path to your downloaded DINOv3 pre-trained weights
+  WEIGHTS: '/home/fryderyk/Downloads/dinov3_models/dinov3_vit-s-16.pth'
+  DTYPE: float32
+
+compute_precision:
+  param_dtype: bf16
+  reduce_dtype: fp32
+  sharding_strategy: SHARD_GRAD_OP
+
+# DINO loss for self-supervised fine-tuning
+dino:
+  loss_weight: 1.0
+  head_n_prototypes: 65536 # Can be adjusted based on dataset size/diversity
+  head_bottleneck_dim: 256
+  head_norm_last_layer: true
+  head_nlayers: 3
+  head_hidden_dim: 2048
+
+# Disable other pre-training losses
+ibot:
+  loss_weight: 0.0
+gram:
+  use_loss: false
+
+train:
+  batch_size_per_gpu: 1 # Adjust based on your GPU memory
+  dataset_path: "/data/dino_data"
+  output_dir: "/home/fryderyk/Documents/code/dinov3/output_finetune"
+  saveckp_freq: 10 # Save checkpoints every 10 epochs
+  seed: 0
+  num_workers: 4
+  OFFICIAL_EPOCH_LENGTH: 500 # Number of iterations per epoch, adjust based on dataset size
+  epochs: 50 # Total number of epochs to fine-tune
+  warmup_epochs: 5
+  lr: 1.0e-05 # Use a small learning rate for fine-tuning
+  min_lr: 1.0e-06
+  weight_decay: 0.05
+  optimizer: adamw
+  centering: sinkhorn_knopp
+  checkpointing: true
+  compile: true
+
+student:
+  arch: vit_small
+  patch_size: 16
+  drop_path_rate: 0.1 # A bit of regularization can be helpful
+  layerscale: 1.0e-04
+  pretrained_weights: '' # Weights are loaded via MODEL.WEIGHTS
+  sin_cos_embeddings: false
+
+# Data augmentations for fine-tuning
+data:
+  dataset_type: image_folder
+  sampler_type: distributed
+  n_global_views: 2
+  n_local_views: 0 # Disable local views for simplicity, can be enabled for better performance
+  global_crops_size: 224
+  global_crops_scale: [0.4, 1.0]
+  local_crops_size: 96
+  local_crops_scale: [0.05, 0.4]

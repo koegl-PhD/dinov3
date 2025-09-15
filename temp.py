@@ -1,48 +1,31 @@
-import pickle
-import os
-import urllib
-
-import numpy as np
-import matplotlib.pyplot as plt
-from PIL import Image
-
 import torch
-import torchvision.transforms.functional as TF
-from sklearn.decomposition import PCA
-from scipy import signal
+from transformers import AutoImageProcessor, AutoModel
+from transformers.image_utils import load_image
 
-import vis
+url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+image = load_image(url)
+print("Image size:", image.height, image.width)  # [480, 640]
 
-PATCH_SIZE = 16
-IMAGE_SIZE = 768
+processor = AutoImageProcessor.from_pretrained("facebook/dinov3-vits16-pretrain-lvd1689m")
+model = AutoModel.from_pretrained("facebook/dinov3-vits16-pretrain-lvd1689m")
+patch_size = model.config.patch_size
+print("Patch size:", patch_size) # 16
+print("Num register tokens:", model.config.num_register_tokens) # 4
 
-IMAGENET_MEAN = (0.485, 0.456, 0.406)
-IMAGENET_STD = (0.229, 0.224, 0.225)
+inputs = processor(images=image, return_tensors="pt")
+print("Preprocessed image size:", inputs.pixel_values.shape)  # [1, 3, 224, 224]
 
+batch_size, _, img_height, img_width = inputs.pixel_values.shape
+num_patches_height, num_patches_width = img_height // patch_size, img_width // patch_size
+num_patches_flat = num_patches_height * num_patches_width
 
-def resize_transform(
-    mask_image: Image,
-    image_size: int = IMAGE_SIZE,
-    patch_size: int = PATCH_SIZE,
-) -> torch.Tensor:
-    w, h = mask_image.size
-    h_patches = int(image_size / patch_size)
-    w_patches = int((w * image_size) / (h * patch_size))
-    return TF.to_tensor(TF.resize(mask_image, (h_patches * patch_size, w_patches * patch_size)))
+with torch.inference_mode():
+  outputs = model(**inputs)
 
+last_hidden_states = outputs.last_hidden_state
+print(last_hidden_states.shape)  # [1, 1 + 4 + 256, 384]
+assert last_hidden_states.shape == (batch_size, 1 + model.config.num_register_tokens + num_patches_flat, model.config.hidden_size)
 
-if __name__ == "__main__":
-    image_1 = Image.open(
-        r"/home/fryderyk/Pictures/Screenshots/im1.png").convert("RGB")
-    image_1_resized = resize_transform(image_1)
-
-    image_2 = Image.open(
-        r"/home/fryderyk/Pictures/Screenshots/im2.png").convert("RGB")
-    image_2_resized = resize_transform(image_2)
-
-    image_1_feat = torch.load(r"/home/fryderyk/Downloads/im1_feat.pt")
-    image_2_feat = torch.load(r"/home/fryderyk/Downloads/im2_feat.pt")
-
-    app = vis.build_app(image_1_feat, image_2_feat)
-    app.run(debug=True, port=8050)
-    x = 0
+cls_token = last_hidden_states[:, 0, :]
+patch_features_flat = last_hidden_states[:, 1 + model.config.num_register_tokens:, :]
+patch_features = patch_features_flat.unflatten(1, (num_patches_height, num_patches_width))

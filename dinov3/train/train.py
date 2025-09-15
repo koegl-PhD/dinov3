@@ -41,7 +41,8 @@ from dinov3.train.multidist_meta_arch import MultiDistillationMetaArch
 from dinov3.train.ssl_meta_arch import SSLMetaArch
 
 assert torch.__version__ >= (2, 1)
-torch.backends.cuda.matmul.allow_tf32 = True  # pytorch 1.12 sets this to false by default
+# pytorch 1.12 sets this to false by default
+torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.benchmark = False  # True
 
 logger = logging.getLogger("dinov3")
@@ -49,14 +50,17 @@ logger = logging.getLogger("dinov3")
 
 def get_args_parser(add_help: bool = True):
     parser = argparse.ArgumentParser("DINOv3 training", add_help=add_help)
-    parser.add_argument("--config-file", default="", metavar="FILE", help="path to config file")
+    parser.add_argument("--config-file", default="",
+                        metavar="FILE", help="path to config file")
     parser.add_argument(
         "--no-resume",
         action="store_true",
         help="Whether to not attempt to resume from the checkpoint directory. ",
     )
-    parser.add_argument("--eval-only", action="store_true", help="perform evaluation only")
-    parser.add_argument("--eval", type=str, default="", help="Eval type to perform")
+    parser.add_argument("--eval-only", action="store_true",
+                        help="perform evaluation only")
+    parser.add_argument("--eval", type=str, default="",
+                        help="Eval type to perform")
     parser.add_argument(
         "--eval_pretrained_weights",
         type=str,
@@ -75,7 +79,7 @@ For python-based LazyConfig, use "path.key=value".
     )
     parser.add_argument(
         "--output-dir",
-        default="./local_dino",
+        default="/home/fryderyk/Documents/code/dinov3/output",
         type=str,
         help="Path to save logs and checkpoints.",
     )
@@ -86,11 +90,15 @@ For python-based LazyConfig, use "path.key=value".
         help="test the codebase for a few iters",
     )
     parser.add_argument("--test-ibot", action="store_true", help="test ibot")
-    parser.add_argument("--profiling", action="store_true", help="do profiling")
-    parser.add_argument("--dump-fsdp-weights", action="store_true", help="dump fsdp weights")
-    parser.add_argument("--record_ref_losses", action="store_true", help="record reference losses")
+    parser.add_argument("--profiling", action="store_true",
+                        help="do profiling")
+    parser.add_argument("--dump-fsdp-weights",
+                        action="store_true", help="dump fsdp weights")
+    parser.add_argument("--record_ref_losses",
+                        action="store_true", help="record reference losses")
     parser.add_argument("--ref_losses_path", default="", type=str)
-    parser.add_argument("--multi-distillation", action="store_true", help="run multi-distillation")
+    parser.add_argument("--multi-distillation",
+                        action="store_true", help="run multi-distillation")
 
     return parser
 
@@ -128,8 +136,10 @@ def build_schedulers(cfg):
     teacher_temp = dict(
         base_value=cfg.teacher["teacher_temp"],
         final_value=cfg.teacher["teacher_temp"],
-        total_iters=cfg.teacher["warmup_teacher_temp_epochs"] * OFFICIAL_EPOCH_LENGTH,
-        warmup_iters=cfg.teacher["warmup_teacher_temp_epochs"] * OFFICIAL_EPOCH_LENGTH,
+        total_iters=cfg.teacher["warmup_teacher_temp_epochs"] *
+        OFFICIAL_EPOCH_LENGTH,
+        warmup_iters=cfg.teacher["warmup_teacher_temp_epochs"] *
+        OFFICIAL_EPOCH_LENGTH,
         start_warmup_value=cfg.teacher["warmup_teacher_temp"],
     )
 
@@ -167,8 +177,11 @@ def build_schedulers_v2(cfg):
             f"Scaling rule {cfg.optim.scaling_rule}, LR peak {cfg.schedules.lr.peak} -> {lr_peak}, LR end {cfg.schedules.lr.end} -> {lr_end}"
         )
     elif cfg.optim.scaling_rule == "sqrt_wrt_1024":
-        lr_peak *= 4 * math.sqrt(cfg.train.batch_size_per_gpu * distributed.get_world_size() / 1024.0)
-        lr_end *= 4 * math.sqrt(cfg.train.batch_size_per_gpu * distributed.get_world_size() / 1024.0)
+        lr_peak *= 4 * \
+            math.sqrt(cfg.train.batch_size_per_gpu *
+                      distributed.get_world_size() / 1024.0)
+        lr_end *= 4 * math.sqrt(cfg.train.batch_size_per_gpu *
+                                distributed.get_world_size() / 1024.0)
         logger.info(
             f"Scaling rule {cfg.optim.scaling_rule}, LR peak {cfg.schedules.lr.peak} -> {lr_peak}, LR end {cfg.schedules.lr.end} -> {lr_end}"
         )
@@ -182,11 +195,13 @@ def build_schedulers_v2(cfg):
         warmup_iterations=iter_per_epoch * cfg.schedules.lr.warmup_epochs,
         total_iterations=total_iterations,
         cosine_iterations=(
-            iter_per_epoch * cfg.schedules.lr.cosine_epochs if "cosine_epochs" in cfg.schedules.lr else None
+            iter_per_epoch *
+            cfg.schedules.lr.cosine_epochs if "cosine_epochs" in cfg.schedules.lr else None
         ),
     )
     last_layer_lr = lr.copy()
-    last_layer_lr[: iter_per_epoch * cfg.schedules.lr.freeze_last_layer_epochs] = 0
+    last_layer_lr[: iter_per_epoch *
+                  cfg.schedules.lr.freeze_last_layer_epochs] = 0
     weight_decay = linear_warmup_cosine_decay(
         start=cfg.schedules.weight_decay.start,
         peak=cfg.schedules.weight_decay.peak,
@@ -283,10 +298,12 @@ def build_data_loader_from_cfg(
         assert cfg.multidistillation.global_batch_size % distributed.get_subgroup_size() == 0
         local_batch_size = cfg.multidistillation.global_batch_size // distributed.get_subgroup_size()
         dataloader_batch_size_per_gpu = (
-            cfg.multidistillation.global_batch_size + (distributed.get_world_size() - 1)
+            cfg.multidistillation.global_batch_size +
+            (distributed.get_world_size() - 1)
         ) // distributed.get_world_size()
     else:
-        local_batch_size = None  # will default to the standard local batch size matching the data batch size
+        # will default to the standard local batch size matching the data batch size
+        local_batch_size = None
         dataloader_batch_size_per_gpu = cfg.train.batch_size_per_gpu
 
     collate_fn = partial(
@@ -338,10 +355,12 @@ def build_multi_resolution_data_loader_from_cfg(
     seed=65537,
 ):
     global_crops_sizes = (
-        [cfg.crops.global_crops_size] if isinstance(cfg.crops.global_crops_size, int) else cfg.crops.global_crops_size
+        [cfg.crops.global_crops_size] if isinstance(
+            cfg.crops.global_crops_size, int) else cfg.crops.global_crops_size
     )
     local_crops_sizes = (
-        [cfg.crops.local_crops_size] if isinstance(cfg.crops.local_crops_size, int) else cfg.crops.local_crops_size
+        [cfg.crops.local_crops_size] if isinstance(
+            cfg.crops.local_crops_size, int) else cfg.crops.local_crops_size
     )
     gram_teacher_crops_sizes = (
         [cfg.crops.gram_teacher_crops_size]
@@ -353,7 +372,8 @@ def build_multi_resolution_data_loader_from_cfg(
         if type(cfg.crops.global_local_crop_pairs_ratios) in [int, float]
         else cfg.crops.global_local_crop_pairs_ratios
     )
-    assert len(global_crops_sizes) == len(local_crops_sizes) == len(gram_teacher_crops_sizes) == len(loader_ratios)
+    assert len(global_crops_sizes) == len(local_crops_sizes) == len(
+        gram_teacher_crops_sizes) == len(loader_ratios)
 
     loaders = []
     for increment, (global_crops_size_i, local_crops_size_i, gram_teacher_crops_size_i) in enumerate(
@@ -364,7 +384,8 @@ def build_multi_resolution_data_loader_from_cfg(
         cfg_i.crops.local_crops_size = local_crops_size_i
         cfg_i.crops.gram_teacher_crops_size = gram_teacher_crops_size_i
         cfg_i.train.seed = cfg.train.seed + increment + 1
-        loaders.append(build_data_loader_from_cfg(cfg=cfg_i, model=model, start_iter=start_iter))
+        loaders.append(build_data_loader_from_cfg(
+            cfg=cfg_i, model=model, start_iter=start_iter))
 
     if len(loaders) == 1:
         data_loader = loaders[0]
@@ -397,7 +418,8 @@ def do_train(cfg, model, resume=False):
     if cfg.multidistillation.enabled:
         register_dont_save_hooks(
             model,
-            dont_save=[k for k, _ in model.state_dict().items() if k.startswith("teacher")],
+            dont_save=[k for k, _ in model.state_dict().items()
+                       if k.startswith("teacher")],
         )
     model.init_weights()
     start_iter = 0
@@ -448,8 +470,10 @@ def do_train(cfg, model, resume=False):
     ):
         # If `start_iter == it_first_update`, we have performed one gram teacher update after
         # iteration `start_iter - 1`, except if we are starting training from scratch and `start_iter == 0`.
-        num_gram_updates = math.ceil((start_iter + 1 - cfg.gram.it_first_update) / cfg.gram.update_frequency)
-        logger.info(f"Gram was updated {num_gram_updates} times before iteration {start_iter}")
+        num_gram_updates = math.ceil(
+            (start_iter + 1 - cfg.gram.it_first_update) / cfg.gram.update_frequency)
+        logger.info(
+            f"Gram was updated {num_gram_updates} times before iteration {start_iter}")
     consecutive_nan_count = 0
     for data in metric_logger.log_every(
         data_loader,
@@ -469,7 +493,8 @@ def do_train(cfg, model, resume=False):
             gc.collect()
 
         if cfg.gram.use_loss and model.gram_it_load_ema_teacher == it:
-            logger.info(f"Loading EMA teacher into Gram teacher before iteration {it}")
+            logger.info(
+                f"Loading EMA teacher into Gram teacher before iteration {it}")
             model.gram_load_ema_teacher()
 
         # Learning rates and other schedules
@@ -482,7 +507,8 @@ def do_train(cfg, model, resume=False):
 
         # Forward backward
         optimizer.zero_grad(set_to_none=True)
-        total_loss, metrics_dict = model.forward_backward(data, teacher_temp=teacher_temp, iteration=it)
+        total_loss, metrics_dict = model.forward_backward(
+            data, teacher_temp=teacher_temp, iteration=it)
 
         # Gradient clipping
         if cfg.optim.clip_grad:
@@ -498,7 +524,8 @@ def do_train(cfg, model, resume=False):
                 )
 
         # Reduce total_loss to check for NaNs, reduce metrics for logging
-        total_loss_all_ranks = total_loss.new_empty(distributed.get_subgroup_size())
+        total_loss_all_ranks = total_loss.new_empty(
+            distributed.get_subgroup_size())
         torch.distributed.all_gather_into_tensor(
             total_loss_all_ranks,
             total_loss.detach(),
@@ -506,7 +533,8 @@ def do_train(cfg, model, resume=False):
         )
         total_loss = total_loss_all_ranks.mean()
         metrics_values = torch.stack(
-            [torch.as_tensor(v, dtype=torch.float32, device=total_loss.device).detach() for v in metrics_dict.values()]
+            [torch.as_tensor(v, dtype=torch.float32, device=total_loss.device).detach(
+            ) for v in metrics_dict.values()]
         )
         torch.distributed.all_reduce(
             metrics_values,
@@ -519,7 +547,8 @@ def do_train(cfg, model, resume=False):
             which_ranks = total_loss_all_ranks.isnan().nonzero().flatten().tolist()
             logger.warning("NaN loss detected on ranks: %s", which_ranks)
             logger.warning("Consecutive NaNs: %d", consecutive_nan_count)
-            metrics_dict_str = "\n".join([f"{k}: {v}" for k, v in metrics_dict.items()])
+            metrics_dict_str = "\n".join(
+                [f"{k}: {v}" for k, v in metrics_dict.items()])
             logger.warning("All-reduced metrics:\n%s", metrics_dict_str)
             if consecutive_nan_count > 2 and not cfg.multidistillation.enabled:
                 msg = "Too many consecutive nans detected in loss, aborting..."
@@ -539,7 +568,8 @@ def do_train(cfg, model, resume=False):
             and (it + 1) % model.gram_update_frequency == 0
             and (cfg.gram.max_updates is None or num_gram_updates < cfg.gram.max_updates)
         ):
-            logger.info(f"Updating Gram teacher from EMA teacher after iteration {it}")
+            logger.info(
+                f"Updating Gram teacher from EMA teacher after iteration {it}")
             model.update_gram()
             num_gram_updates += 1
 
@@ -552,10 +582,12 @@ def do_train(cfg, model, resume=False):
 
         # Submit evaluation jobs
         if (
-            cfg.evaluation.eval_period_iterations > 0 and (iteration + 1) % cfg.evaluation.eval_period_iterations == 0
+            cfg.evaluation.eval_period_iterations > 0 and (
+                iteration + 1) % cfg.evaluation.eval_period_iterations == 0
             # and iteration != max_iter - 1
         ):
-            do_test(cfg, model, f"training_{iteration}", process_group=process_subgroup)
+            do_test(cfg, model, f"training_{iteration}",
+                    process_group=process_subgroup)
             torch.cuda.synchronize()
 
         # Checkpointing
@@ -570,7 +602,8 @@ def do_train(cfg, model, resume=False):
                 process_group=process_subgroup,
             )
             if distributed.is_subgroup_main_process():
-                keep_last_n_checkpoints(ckpt_dir, cfg.checkpointing.max_to_keep)
+                keep_last_n_checkpoints(
+                    ckpt_dir, cfg.checkpointing.max_to_keep)
                 if "keep_every" in cfg.checkpointing and (iteration + 1) % cfg.checkpointing.keep_every == 0:
                     keep_checkpoint_copy(ckpt_dir / str(iteration))
 
@@ -605,7 +638,8 @@ def main(argv=None):
         "MultiDistillationMetaArch": MultiDistillationMetaArch,
     }.get(cfg.MODEL.META_ARCHITECTURE, None)
     if meta_arch is None:
-        raise ValueError(f"Unknown MODEL.META_ARCHITECTURE {cfg.MODEL.META_ARCHITECTURE}")
+        raise ValueError(
+            f"Unknown MODEL.META_ARCHITECTURE {cfg.MODEL.META_ARCHITECTURE}")
     logger.info(f"Making meta arch {meta_arch.__name__}")
     with torch.device("meta"):
         model = meta_arch(cfg)
@@ -615,7 +649,8 @@ def main(argv=None):
     model._apply(
         lambda t: torch.full_like(
             t,
-            fill_value=math.nan if t.dtype.is_floating_point else (2 ** (t.dtype.itemsize * 8 - 1)),
+            fill_value=math.nan if t.dtype.is_floating_point else (
+                2 ** (t.dtype.itemsize * 8 - 1)),
             device="cuda",
         ),
         recurse=True,
