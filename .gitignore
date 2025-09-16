@@ -16,3 +16,5 @@ dist/
 
 # Ignore vscode directory
 .vscode/
+outputs/logs/log.txt
+outputs/nan_logs/logs/log.txt
