@@ -29,7 +29,7 @@ gram:
 
 train:
   batch_size_per_gpu: 1 # Adjust based on your GPU memory
-  dataset_path: "/data/dino_data"
+  dataset_path: "MinimalDataset:root=/data/dinov3_dataset/Sebastian.png"
   output_dir: "/home/fryderyk/Documents/code/dinov3/output_finetune"
   saveckp_freq: 10 # Save checkpoints every 10 epochs
   seed: 0
