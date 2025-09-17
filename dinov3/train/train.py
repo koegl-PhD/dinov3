@@ -669,4 +669,10 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+
+    from dinov3.data.loaders import make_dataset
+    ds = make_dataset(dataset_str="MinimalDataset:root=/home/koeglf/Downloads/data_dino",
+                      transform=lambda img: img, target_transform=lambda _: ())
+    print(len(ds), ds[0][0].size)
+
     main()
