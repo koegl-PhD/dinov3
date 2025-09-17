@@ -1,8 +1,14 @@
 from __future__ import annotations
 import os
-from typing import Iterable, List, Optional, Sequence, Tuple
+from enum import Enum
+from typing import Union, List, Optional, Sequence
 from .extended import ExtendedVisionDataset
 from .decoders import ImageDataDecoder, TargetDecoder
+
+
+class _Split(Enum):
+    TRAIN = "train"
+    VAL = "val"
 
 
 class MinimalDataset(ExtendedVisionDataset):
@@ -18,10 +24,12 @@ class MinimalDataset(ExtendedVisionDataset):
     Returns image bytes -> decoded by ImageDataDecoder; target is 0.
     """
     Target = int
+    Split = Union[_Split]
 
     def __init__(
         self,
         *,
+        split: "MinimalDataset.Split",
         root: str,
         transforms=None,
         transform=None,
@@ -38,6 +46,7 @@ class MinimalDataset(ExtendedVisionDataset):
             image_decoder=ImageDataDecoder,
             target_decoder=TargetDecoder,
         )
+        self._split = split
         exts = tuple(e.lower() for e in (extensions or ()))
         files: List[str] = []
         for fn in os.listdir(root):
@@ -49,6 +58,10 @@ class MinimalDataset(ExtendedVisionDataset):
         if not files:
             raise RuntimeError(f"No images found under '{root}'.")
         self._files = files
+
+    @property
+    def split(self) -> "MinimalDataset.Split":
+        return self._split
 
     def get_image_data(self, index: int) -> bytes:
         with open(self._files[index], "rb") as f:

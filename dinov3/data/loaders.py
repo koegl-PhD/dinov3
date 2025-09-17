@@ -70,6 +70,8 @@ def _parse_dataset_str(dataset_str: str):
             kwargs["split"] = CocoCaptions.Split[kwargs["split"]]
     elif name == "MinimalDataset":
         class_ = MinimalDataset
+        if "split" in kwargs:
+            kwargs["split"] = MinimalDataset.Split[kwargs["split"]]
     else:
         raise ValueError(f'Unsupported dataset "{name}"')
 
