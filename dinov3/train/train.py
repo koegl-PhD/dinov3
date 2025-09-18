@@ -17,6 +17,8 @@ import torch
 import torch.distributed
 from torch.distributed._tensor import DTensor
 
+from dinov3 import ut
+
 import dinov3.distributed as distributed
 from dinov3.checkpointer import (
     find_latest_checkpoint,
@@ -407,6 +409,7 @@ def do_train(cfg, model, resume=False):
 
     model.train()
     # Optimizer
+
     optimizer = build_optimizer(cfg, model.get_params_groups())
     (
         lr_schedule,
@@ -421,7 +424,7 @@ def do_train(cfg, model, resume=False):
             dont_save=[k for k, _ in model.state_dict().items()
                        if k.startswith("teacher")],
         )
-    model.init_weights()
+
     start_iter = 0
     if resume and (last_checkpoint_dir := find_latest_checkpoint(ckpt_dir)):
         logger.info(f"Checkpoint found {last_checkpoint_dir}")
@@ -643,18 +646,40 @@ def main(argv=None):
     logger.info(f"Making meta arch {meta_arch.__name__}")
     with torch.device("meta"):
         model = meta_arch(cfg)
+    # <-- materialize params (no longer META)
+
+    model.to_empty(device="cuda")
+    model.init_weights()
+    ut.swap_backbones_with_hub(
+        model,
+        repo_dir="/home/koeglf/Documents/code/dinov3",
+        model_name="dinov3_vits16",
+        ckpt_path=cfg.MODEL.WEIGHTS,
+    )
+    for k in ("student", "teacher", "model_ema"):
+        model.__getattr__(k)["backbone"].to("cuda")
+
+    ut.align_ln_eps_all_backbones(model, eps=1e-5)
+
+    im_path = '/home/koeglf/Downloads/data_dino/val/cat.jpg'
+    save_path_infer = '/home/koeglf/Downloads/data_dino/val/cat_infer.jpg'
+    save_path_old = '/home/koeglf/Downloads/data_dino/val/cat_old.jpg'
+    x0, y0 = 5, 7
+    feat_old = ut.old_run(im_path, save_path_old, x0, y0)
+    feat_infer = ut.infer_single_image(model, im_path, save_path_infer, x0, y0)
+
     model.prepare_for_distributed_training()
     # Fill all values with `nans` so that we identify
     # non-initialized values
-    model._apply(
-        lambda t: torch.full_like(
-            t,
-            fill_value=math.nan if t.dtype.is_floating_point else (
-                2 ** (t.dtype.itemsize * 8 - 1)),
-            device="cuda",
-        ),
-        recurse=True,
-    )
+    # model._apply(
+    #     lambda t: torch.full_like(
+    #         t,
+    #         fill_value=math.nan if t.dtype.is_floating_point else (
+    #             2 ** (t.dtype.itemsize * 8 - 1)),
+    #         device="cuda",
+    #     ),
+    #     recurse=True,
+    # )
     logger.info(f"Model after distributed:\n{model}")
     if args.eval_only:
         model.init_weights()
@@ -669,4 +694,5 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+
     main()

@@ -63,7 +63,7 @@ gram:
   loss_weight_schedule: null
 train:
   batch_size_per_gpu: 1
-  dataset_path: MinimalDataset:root=/home/koeglf/Downloads/data_dino
+  dataset_path: MinimalDataset:root=/home/koeglf/Downloads/data_dino/train:split=TRAIN
   data_config: null
   output_dir: /home/koeglf/Documents/code/dinov3/outputs
   saveckp_freq: 10

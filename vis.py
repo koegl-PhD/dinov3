@@ -10,6 +10,7 @@ from typing import Tuple
 import numpy as np
 from dash import Input, Output, no_update, ctx
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 
 from dash import Dash, dcc, html, Input, Output, no_update, ctx, Patch
 import numpy as np
@@ -82,6 +83,22 @@ def map_coords(y: int, x: int, src_hw: Tuple[int, int], dst_hw: Tuple[int, int])
     xd = int(round(u * (Wd - 1)))
     yd = int(round(v * (Hd - 1)))
     return yd, xd
+
+
+def simple_plot(x: torch.Tensor, y0: int, x0: int, save_path: str):
+
+    fig, ax = plt.subplots()
+
+    x_n = F.normalize(x, p=2, dim=0).detach().cpu().numpy().astype(np.float32)
+    ref = x_n[:, y0, x0]
+
+    sim = cosine_map_fast(x_n, ref)
+
+    ax.imshow(sim, cmap='magma')
+
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+    plt.show()
 
 
 def build_app(f1: torch.Tensor, f2: torch.Tensor) -> Dash:

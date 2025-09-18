@@ -49,11 +49,13 @@ class SSLMetaArch(nn.Module):
         teacher_model_dict = dict()
         gram_model_dict = dict()
 
-        student_backbone, teacher_backbone, embed_dim = build_model_from_cfg(cfg)
+        student_backbone, teacher_backbone, embed_dim = build_model_from_cfg(
+            cfg)
         torch.cuda.empty_cache()
         gc.collect()
         gram_backbone, _ = build_model_from_cfg(cfg, only_teacher=True)
-        logger.info(f"Number of parameters: {count_parameters(student_backbone)}")
+        logger.info(
+            f"Number of parameters: {count_parameters(student_backbone)}")
         student_model_dict["backbone"] = student_backbone
         teacher_model_dict["backbone"] = teacher_backbone
         gram_model_dict["backbone"] = gram_backbone
@@ -64,11 +66,16 @@ class SSLMetaArch(nn.Module):
 
         logger.info("OPTIONS -- DINO")
         logger.info(f"OPTIONS -- DINO -- loss_weight: {cfg.dino.loss_weight}")
-        logger.info(f"OPTIONS -- DINO -- global_ignore_diagonal: {cfg.dino.global_ignore_diagonal}")
-        logger.info(f"OPTIONS -- DINO -- head_n_prototypes: {cfg.dino.head_n_prototypes}")
-        logger.info(f"OPTIONS -- DINO -- head_bottleneck_dim: {cfg.dino.head_bottleneck_dim}")
-        logger.info(f"OPTIONS -- DINO -- head_hidden_dim: {cfg.dino.head_hidden_dim}")
-        logger.info(f"OPTIONS -- DINO -- head_norm_last_layer: {cfg.dino.head_norm_last_layer}")
+        logger.info(
+            f"OPTIONS -- DINO -- global_ignore_diagonal: {cfg.dino.global_ignore_diagonal}")
+        logger.info(
+            f"OPTIONS -- DINO -- head_n_prototypes: {cfg.dino.head_n_prototypes}")
+        logger.info(
+            f"OPTIONS -- DINO -- head_bottleneck_dim: {cfg.dino.head_bottleneck_dim}")
+        logger.info(
+            f"OPTIONS -- DINO -- head_hidden_dim: {cfg.dino.head_hidden_dim}")
+        logger.info(
+            f"OPTIONS -- DINO -- head_norm_last_layer: {cfg.dino.head_norm_last_layer}")
         dino_head_class = partial(
             DINOHead,
             in_dim=embed_dim,
@@ -82,8 +89,10 @@ class SSLMetaArch(nn.Module):
         self.dino_loss = DINOLoss(self.dino_out_dim)
 
         logger.info("OPTIONS -- KOLEO")
-        logger.info(f"OPTIONS -- KOLEO -- loss_weight: {cfg.dino.koleo_loss_weight}")
-        logger.info(f"OPTIONS -- KOLEO -- distributed: {cfg.dino.koleo_loss_distributed}")
+        logger.info(
+            f"OPTIONS -- KOLEO -- loss_weight: {cfg.dino.koleo_loss_weight}")
+        logger.info(
+            f"OPTIONS -- KOLEO -- distributed: {cfg.dino.koleo_loss_distributed}")
         if cfg.dino.koleo_loss_distributed:
             logger.info(f"OPTIONS -- KOLEO -- topk: {cfg.dino.koleo_topk}")
             logger.info(
@@ -102,17 +111,23 @@ class SSLMetaArch(nn.Module):
 
         logger.info("OPTIONS -- IBOT")
         logger.info(f"OPTIONS -- IBOT -- loss_weight: {cfg.ibot.loss_weight}")
-        logger.info(f"OPTIONS -- IBOT masking -- ibot_mask_ratio_tuple: {cfg.ibot.mask_ratio_min_max}")
-        logger.info(f"OPTIONS -- IBOT masking -- ibot_mask_sample_probability: {cfg.ibot.mask_sample_probability}")
+        logger.info(
+            f"OPTIONS -- IBOT masking -- ibot_mask_ratio_tuple: {cfg.ibot.mask_ratio_min_max}")
+        logger.info(
+            f"OPTIONS -- IBOT masking -- ibot_mask_sample_probability: {cfg.ibot.mask_sample_probability}")
 
         assert 0 <= cfg.ibot.mask_ratio_min_max[0] < cfg.ibot.mask_ratio_min_max[1] <= 1, (
             "provide a valid cfg.ibot.mask_ratio_min_max"
         )
         assert 0 <= cfg.ibot.mask_sample_probability <= 1, "provide a positive mask probability for ibot"
-        logger.info(f"OPTIONS -- IBOT -- head_n_prototypes: {cfg.ibot.head_n_prototypes}")
-        logger.info(f"OPTIONS -- IBOT -- head_bottleneck_dim: {cfg.ibot.head_bottleneck_dim}")
-        logger.info(f"OPTIONS -- IBOT -- head_hidden_dim: {cfg.ibot.head_hidden_dim}")
-        logger.info(f"OPTIONS -- IBOT -- head_norm_last_layer: {cfg.ibot.head_norm_last_layer}")
+        logger.info(
+            f"OPTIONS -- IBOT -- head_n_prototypes: {cfg.ibot.head_n_prototypes}")
+        logger.info(
+            f"OPTIONS -- IBOT -- head_bottleneck_dim: {cfg.ibot.head_bottleneck_dim}")
+        logger.info(
+            f"OPTIONS -- IBOT -- head_hidden_dim: {cfg.ibot.head_hidden_dim}")
+        logger.info(
+            f"OPTIONS -- IBOT -- head_norm_last_layer: {cfg.ibot.head_norm_last_layer}")
         ibot_head_class = partial(
             DINOHead,
             in_dim=embed_dim,
@@ -129,7 +144,8 @@ class SSLMetaArch(nn.Module):
         self.student = nn.ModuleDict(student_model_dict)
         self.teacher = nn.ModuleDict(teacher_model_dict)
         self.model_ema = self.teacher  # this may be overwritten for distillation
-        logger.info(f"Student and Teacher are built: they are both {cfg.student.arch} network.")
+        logger.info(
+            f"Student and Teacher are built: they are both {cfg.student.arch} network.")
 
         if cfg.distillation.enabled:
             self._setup_distillation()
@@ -179,7 +195,8 @@ class SSLMetaArch(nn.Module):
             if self.has_gram_teacher:
                 self.gram_teacher = nn.ModuleDict(gram_model_dict)
                 self.gram_teacher.requires_grad_(False)
-                logger.info(f"Gram teacher parameter at init: {next(self.gram_teacher.named_parameters())}")
+                logger.info(
+                    f"Gram teacher parameter at init: {next(self.gram_teacher.named_parameters())}")
             else:
                 self.gram_teacher = None
 
@@ -198,21 +215,29 @@ class SSLMetaArch(nn.Module):
                         iter_per_epoch * schedule_cfg.cosine_epochs if "cosine_epochs" in schedule_cfg else None
                     ),
                 )
-                logger.info(f"Applying gram loss weight schedule instead of `cfg.gram.loss_weight`: {schedule_cfg}")
+                logger.info(
+                    f"Applying gram loss weight schedule instead of `cfg.gram.loss_weight`: {schedule_cfg}")
             else:
                 self.gram_loss_schedule = None
-            self.gram_ema_teacher = self.cfg.gram.ema_teacher  # If true use the EMA_teacher as gram_teacher
+            # If true use the EMA_teacher as gram_teacher
+            self.gram_ema_teacher = self.cfg.gram.ema_teacher
             self.gram_ckpt = self.cfg.gram.ckpt  # Checkpoint to the first gram teacher model
-            self.gram_img_level = self.cfg.gram.img_level  # Apply the loss on the image, if false on the batch
-            self.gram_tokens_used = self.cfg.gram.tokens_used  # Any value in ["all", "masked", "unmasked"]
+            # Apply the loss on the image, if false on the batch
+            self.gram_img_level = self.cfg.gram.img_level
+            # Any value in ["all", "masked", "unmasked"]
+            self.gram_tokens_used = self.cfg.gram.tokens_used
             # Update the teacher frequently
-            self.gram_rep_update = self.cfg.gram.rep_update  # bool, if yes the gram teacher will be updated at the freq
-            self.gram_update_frequency = self.cfg.gram.update_frequency  # defined by this var update_frequency
-            self.gram_it_first_update = self.cfg.gram.it_first_update  # after iteration it_first_update is passed.
+            # bool, if yes the gram teacher will be updated at the freq
+            self.gram_rep_update = self.cfg.gram.rep_update
+            # defined by this var update_frequency
+            self.gram_update_frequency = self.cfg.gram.update_frequency
+            # after iteration it_first_update is passed.
+            self.gram_it_first_update = self.cfg.gram.it_first_update
             self.gram_it_load_ema_teacher = (
                 self.cfg.gram.it_load_ema_teacher
             )  # after iteration it_load_ema the ema teacher is loaded into the gram teacher
-            self.gram_compute_stats = self.cfg.gram.compute_stats  # whether to compute auxiliary stats
+            # whether to compute auxiliary stats
+            self.gram_compute_stats = self.cfg.gram.compute_stats
             self.gram_params_lists = None
 
             if self.gram_ema_teacher and self.gram_ckpt is not None:
@@ -231,37 +256,52 @@ class SSLMetaArch(nn.Module):
                 assert self.gram_img_level is False
 
             logger.info("OPTIONS -- GRAM")
-            logger.info(f"OPTIONS -- GRAM -- loss_weight: {cfg.gram.loss_weight}")
-            logger.info(f"OPTIONS -- GRAM -- ema teacher: {cfg.gram.ema_teacher}")
+            logger.info(
+                f"OPTIONS -- GRAM -- loss_weight: {cfg.gram.loss_weight}")
+            logger.info(
+                f"OPTIONS -- GRAM -- ema teacher: {cfg.gram.ema_teacher}")
             logger.info(f"OPTIONS -- GRAM -- ckpt: {cfg.gram.ckpt}")
             if self.cfg.gram.rep_update:
-                logger.info(f"OPTIONS -- GRAM -- repeated update: {cfg.gram.rep_update}")
-                logger.info(f"OPTIONS -- GRAM -- update freq: {cfg.gram.update_frequency}")
-                logger.info(f"OPTIONS -- GRAM -- iteration first update: {cfg.gram.it_first_update}")
+                logger.info(
+                    f"OPTIONS -- GRAM -- repeated update: {cfg.gram.rep_update}")
+                logger.info(
+                    f"OPTIONS -- GRAM -- update freq: {cfg.gram.update_frequency}")
+                logger.info(
+                    f"OPTIONS -- GRAM -- iteration first update: {cfg.gram.it_first_update}")
 
-            logger.info(f"OPTIONS -- GRAM -- tokens_used: {cfg.gram.tokens_used}")
-            logger.info(f"OPTIONS -- GRAM -- apply normalization: {cfg.gram.normalized}")
+            logger.info(
+                f"OPTIONS -- GRAM -- tokens_used: {cfg.gram.tokens_used}")
+            logger.info(
+                f"OPTIONS -- GRAM -- apply normalization: {cfg.gram.normalized}")
             logger.info(f"OPTIONS -- GRAM -- img_level: {cfg.gram.img_level}")
-            logger.info(f"OPTIONS -- GRAM -- remove_neg: {cfg.gram.remove_neg}")
-            logger.info(f"OPTIONS -- GRAM -- remove_only_teacher_neg: {cfg.gram.remove_only_teacher_neg}")
+            logger.info(
+                f"OPTIONS -- GRAM -- remove_neg: {cfg.gram.remove_neg}")
+            logger.info(
+                f"OPTIONS -- GRAM -- remove_only_teacher_neg: {cfg.gram.remove_only_teacher_neg}")
 
             if cfg.crops.gram_teacher_crops_size is None and self.has_gram_teacher:
-                raise ValueError("cfg.crops.gram_teacher_crops_size must be set to use gram loss")
+                raise ValueError(
+                    "cfg.crops.gram_teacher_crops_size must be set to use gram loss")
             if cfg.crops.gram_teacher_crops_size is not None and self.gram_ema_teacher:
-                raise ValueError("cfg.crops.gram_teacher_crops_size shoud be None when gram.ema_teacher=True")
+                raise ValueError(
+                    "cfg.crops.gram_teacher_crops_size shoud be None when gram.ema_teacher=True")
 
             self.student_crop_size = cfg.crops.global_crops_size
             self.gram_global_teacher_resize_method = cfg.gram.global_teacher_resize_method
             self.gram_global_teacher_resize_antialias = cfg.gram.global_teacher_resize_antialias
-            logger.info(f"OPTIONS -- global crops student/teacher size: {self.student_crop_size}")
-            logger.info(f"OPTIONS -- global crops GRAM teacher size: {cfg.crops.gram_teacher_crops_size}")
-            logger.info(f"OPTIONS -- global crops GRAM teacher resize method: {cfg.gram.global_teacher_resize_method}")
+            logger.info(
+                f"OPTIONS -- global crops student/teacher size: {self.student_crop_size}")
+            logger.info(
+                f"OPTIONS -- global crops GRAM teacher size: {cfg.crops.gram_teacher_crops_size}")
+            logger.info(
+                f"OPTIONS -- global crops GRAM teacher resize method: {cfg.gram.global_teacher_resize_method}")
             logger.info(
                 f"OPTIONS -- global crops GRAM teacher resize antialias: {cfg.gram.global_teacher_resize_antialias}"
             )
 
     def _setup_distillation(self):
-        logger.info(f"Performing distillation from {self.cfg.distillation.full_cfg_path}")
+        logger.info(
+            f"Performing distillation from {self.cfg.distillation.full_cfg_path}")
 
         default_cfg = get_default_config()
         distillation_cfg = OmegaConf.load(self.cfg.distillation.full_cfg_path)
@@ -274,7 +314,8 @@ class SSLMetaArch(nn.Module):
 
         teacher_model_dict = dict()
 
-        backbone, embed_dim = build_model_from_cfg(distillation_cfg, only_teacher=True)
+        backbone, embed_dim = build_model_from_cfg(
+            distillation_cfg, only_teacher=True)
         teacher_model_dict["backbone"] = backbone
 
         teacher_model_dict["dino_head"] = DINOHead(
@@ -303,7 +344,8 @@ class SSLMetaArch(nn.Module):
         self.model_ema.load_state_dict(self.student.state_dict())
         if self.has_gram_teacher:
             if self.gram_ckpt is not None:
-                logger.info(f"Loading pretrained weights from {self.gram_ckpt}")
+                logger.info(
+                    f"Loading pretrained weights from {self.gram_ckpt}")
                 init_fsdp_model_from_checkpoint(
                     self.gram_teacher,
                     self.gram_ckpt,
@@ -313,7 +355,8 @@ class SSLMetaArch(nn.Module):
                         "dino_loss.center",
                         "ibot_patch_loss.center",
                     ],
-                    keys_not_sharded=["backbone.rope_embed.periods", "qkv.bias_mask"],
+                    keys_not_sharded=[
+                        "backbone.rope_embed.periods", "qkv.bias_mask"],
                     process_group=distributed.get_default_process_group(),
                 )
                 self.gram_teacher_initialized = True
@@ -322,26 +365,32 @@ class SSLMetaArch(nn.Module):
             self.gram_teacher.requires_grad_(False)
             self.gram_teacher.eval()
         if self.cfg.student.resume_from_teacher_chkpt:
-            logger.info(f"Loading pretrained weights from {self.cfg.student.resume_from_teacher_chkpt}")
+            logger.info(
+                f"Loading pretrained weights from {self.cfg.student.resume_from_teacher_chkpt}")
             init_fsdp_model_from_checkpoint(
                 self.student,
                 self.cfg.student.resume_from_teacher_chkpt,
                 skip_load_keys=["dino_loss.center", "ibot_patch_loss.center"],
-                keys_not_sharded=["backbone.rope_embed.periods", "qkv.bias_mask"],
+                keys_not_sharded=[
+                    "backbone.rope_embed.periods", "qkv.bias_mask"],
                 process_group=distributed.get_process_subgroup(),
             )
             self.model_ema.load_state_dict(self.student.state_dict())
         if self.cfg.distillation.enabled:
             if self.cfg.distillation.checkpoint_path != "ignore":
-                logger.info(f"Loading teacher to distil from : {self.cfg.distillation.checkpoint_path}")
+                logger.info(
+                    f"Loading teacher to distil from : {self.cfg.distillation.checkpoint_path}")
                 init_fsdp_model_from_checkpoint(
                     self.teacher,
                     self.cfg.distillation.checkpoint_path,
-                    skip_load_keys=["dino_loss.center", "ibot_patch_loss.center"],
-                    keys_not_sharded=["backbone.rope_embed.periods", "qkv.bias_mask"],
+                    skip_load_keys=["dino_loss.center",
+                                    "ibot_patch_loss.center"],
+                    keys_not_sharded=[
+                        "backbone.rope_embed.periods", "qkv.bias_mask"],
                 )
             else:
-                logger.info("Init teacher to distil from, used for testing purpose only")
+                logger.info(
+                    "Init teacher to distil from, used for testing purpose only")
                 self.teacher.backbone.init_weights()
                 self.teacher.dino_head.init_weights()
                 self.teacher.ibot_head.init_weights()
@@ -366,13 +415,15 @@ class SSLMetaArch(nn.Module):
         masks = data["collated_masks"].cuda(non_blocking=True)
         mask_indices_list = data["mask_indices_list"].cuda(non_blocking=True)
         masks_weight = data["masks_weight"].cuda(non_blocking=True)
-        n_masked_patches_tensor = data["n_masked_patches"].cuda(non_blocking=True)
+        n_masked_patches_tensor = data["n_masked_patches"].cuda(
+            non_blocking=True)
 
         if self.has_gram_teacher:
             assert "collated_gram_teacher_crops" in data, (
                 "no gram teacher crops in the data, have you set cfg.crops.gram_teacher_crops_size?"
             )
-            gram_teacher_crops = data["collated_gram_teacher_crops"].cuda(non_blocking=True)
+            gram_teacher_crops = data["collated_gram_teacher_crops"].cuda(
+                non_blocking=True)
         else:
             gram_teacher_crops = None
 
@@ -397,7 +448,8 @@ class SSLMetaArch(nn.Module):
         # Gram output
         if self.gram_use_loss:
             gram_global = self.get_gram_teacher_output(
-                gram_teacher_crops.unflatten(0, (n_global_crops, B)) if gram_teacher_crops is not None else None,
+                gram_teacher_crops.unflatten(
+                    0, (n_global_crops, B)) if gram_teacher_crops is not None else None,
                 masks=masks,
                 teacher_global=teacher_global,
                 student_global=student_global,
@@ -442,7 +494,8 @@ class SSLMetaArch(nn.Module):
         ibot_patch = backbone_out["x_norm_patchtokens"]  # [n_crops * B, P, D]
 
         # IBOT head only on patches that are masked for the student
-        buffer = torch.index_select(ibot_patch.flatten(0, 1), dim=0, index=mask_indices_list)
+        buffer = torch.index_select(ibot_patch.flatten(
+            0, 1), dim=0, index=mask_indices_list)
         masked_patch_after_head = self.teacher.ibot_head(buffer)
 
         # DINO head on CLS tokens
@@ -452,7 +505,8 @@ class SSLMetaArch(nn.Module):
         cls_centered = self.dino_loss.sinkhorn_knopp_teacher(
             cls_after_head, teacher_temp=teacher_temp
         )  # [n_crops * B, K]
-        cls_centered = cls_centered.unflatten(0, (n_crops, B))  # [n_crops, B, K]
+        cls_centered = cls_centered.unflatten(
+            0, (n_crops, B))  # [n_crops, B, K]
         masked_patch_centered = self.ibot_patch_loss.sinkhorn_knopp_teacher(
             masked_patch_after_head,
             teacher_temp=teacher_temp,
@@ -461,29 +515,38 @@ class SSLMetaArch(nn.Module):
 
         return {
             "cls_pre_head": cls.unflatten(0, [n_crops, B]),  # [n_crops, B, D]
-            "reg_pre_head": reg.unflatten(0, [n_crops, B]),  # [n_crops, B, R, D]
-            "patch_pre_head": ibot_patch.unflatten(0, [n_crops, B]),  # [n_crops, B, P, D]
-            "cls_after_head": cls_after_head.unflatten(0, [n_crops, B]),  # [n_crops, B, K]
+            # [n_crops, B, R, D]
+            "reg_pre_head": reg.unflatten(0, [n_crops, B]),
+            # [n_crops, B, P, D]
+            "patch_pre_head": ibot_patch.unflatten(0, [n_crops, B]),
+            # [n_crops, B, K]
+            "cls_after_head": cls_after_head.unflatten(0, [n_crops, B]),
             "cls_centered": cls_centered,  # [n_crops, B, K]
-            "masked_patch_centered": masked_patch_centered,  # [n_masked_patches, K]
+            # [n_masked_patches, K]
+            "masked_patch_centered": masked_patch_centered,
         }
 
     def get_gram_teacher_output(self, images, *, masks, teacher_global, student_global, student_global_crops_size):
         # Get student patch features
-        student_patches = student_global["patch_pre_head"].flatten(0, 1)  # [n_crops * B, P, D]
+        student_patches = student_global["patch_pre_head"].flatten(
+            0, 1)  # [n_crops * B, P, D]
 
         # Get gram targets
         if self.gram_ema_teacher:
-            teacher_patches = teacher_global["patch_pre_head"].flatten(0, 1)  # [n_crops * B, P, D]
+            teacher_patches = teacher_global["patch_pre_head"].flatten(
+                0, 1)  # [n_crops * B, P, D]
         else:
             if not self.gram_teacher_initialized:
-                raise ValueError("Gram teacher has not been initialized. Load a checkpoint or from the EMA teacher.")
+                raise ValueError(
+                    "Gram teacher has not been initialized. Load a checkpoint or from the EMA teacher.")
             n_crops, B, rgb, H, W = images.shape
             images = images.flatten(0, 1)  # [n_crops * B, rgb, H, W]
 
             with torch.no_grad():
-                backbone_out = self.gram_teacher.backbone(images, is_training=True)
-            teacher_patches = backbone_out["x_norm_patchtokens"]  # [n_crops * B, P_T, D]
+                backbone_out = self.gram_teacher.backbone(
+                    images, is_training=True)
+            # [n_crops * B, P_T, D]
+            teacher_patches = backbone_out["x_norm_patchtokens"]
 
             # Downsample Gram teacher features if needed
             if teacher_patches.shape[1] != student_patches.shape[1]:
@@ -491,7 +554,9 @@ class SSLMetaArch(nn.Module):
                 assert teacher_patches.shape[1] == N**2
                 N_student = student_global_crops_size // self.cfg.student.patch_size
                 assert student_patches.shape[1] == N_student**2
-                patches_hw = teacher_patches.transpose(-2, -1).unflatten(-1, (N, N))  # [n_crops * B, D, N, N]
+                # [n_crops * B, D, N, N]
+                patches_hw = teacher_patches.transpose(
+                    -2, -1).unflatten(-1, (N, N))
                 patches_hw = torch.nn.functional.interpolate(
                     patches_hw,
                     size=(N_student, N_student),
@@ -515,11 +580,15 @@ class SSLMetaArch(nn.Module):
             teacher_patches = teacher_patches[~masks]
 
         return {
-            "student_patches": student_patches,  # [n_crops * B, P, D] or [n_selected_patches, D]
-            "teacher_patches": teacher_patches,  # [n_crops * B, P, D] or [n_selected_patches, D]
+            # [n_crops * B, P, D] or [n_selected_patches, D]
+            "student_patches": student_patches,
+            # [n_crops * B, P, D] or [n_selected_patches, D]
+            "teacher_patches": teacher_patches,
             # Unmasked patches, for computing statistics
-            "orig_student_patches": orig_student_patches,  # [n_crops * B, P, D]
-            "orig_teacher_patches": orig_teacher_patches,  # [n_crops * B, P, D]
+            # [n_crops * B, P, D]
+            "orig_student_patches": orig_student_patches,
+            # [n_crops * B, P, D]
+            "orig_teacher_patches": orig_teacher_patches,
         }
 
     def get_student_output(self, *, global_crops, local_crops, upperbound, masks, mask_indices_list):
@@ -546,8 +615,10 @@ class SSLMetaArch(nn.Module):
         )
 
         # IBOT head only on masked patches
-        masked_patches_pre_head = torch.index_select(g_patch.flatten(0, 1), dim=0, index=mask_indices_list)
-        global_masked_patch_after_head = self.student.ibot_head(masked_patches_pre_head)
+        masked_patches_pre_head = torch.index_select(
+            g_patch.flatten(0, 1), dim=0, index=mask_indices_list)
+        global_masked_patch_after_head = self.student.ibot_head(
+            masked_patches_pre_head)
 
         # DINO head on CLS tokens (all in one pass)
         buffer = [
@@ -555,23 +626,35 @@ class SSLMetaArch(nn.Module):
             l_cls,  # [n_local_crops * B, D]
         ]
         sizes = [x.shape[0] for x in buffer]
-        buffer = torch.cat(buffer, dim=0)  # [n_global_crops * B + n_local_crops * B, D]
-        buffer = self.student.dino_head(buffer)  # [n_global_crops * B + n_local_crops * B, K]
+        # [n_global_crops * B + n_local_crops * B, D]
+        buffer = torch.cat(buffer, dim=0)
+        # [n_global_crops * B + n_local_crops * B, K]
+        buffer = self.student.dino_head(buffer)
         buffer = torch.split_with_sizes(buffer, sizes, dim=0)
 
         global_out = {
-            "cls_pre_head": g_cls.unflatten(0, [n_global_crops, B]),  # [n_global_crops, B, D]
-            "reg_pre_head": g_reg.unflatten(0, [n_global_crops, B]),  # [n_global_crops, B, R, D]
-            "patch_pre_head": g_patch.unflatten(0, [n_global_crops, B]),  # [n_global_crops, B, P, D]
-            "cls_after_head": buffer[0].unflatten(0, [n_global_crops, B]),  # [n_global_crops, B, K],
-            "masked_patch_after_head": global_masked_patch_after_head,  # [n_masked_patches, K]
-            "masked_patch_pre_head": masked_patches_pre_head,  # [n_masked_patches, D]
+            # [n_global_crops, B, D]
+            "cls_pre_head": g_cls.unflatten(0, [n_global_crops, B]),
+            # [n_global_crops, B, R, D]
+            "reg_pre_head": g_reg.unflatten(0, [n_global_crops, B]),
+            # [n_global_crops, B, P, D]
+            "patch_pre_head": g_patch.unflatten(0, [n_global_crops, B]),
+            # [n_global_crops, B, K],
+            "cls_after_head": buffer[0].unflatten(0, [n_global_crops, B]),
+            # [n_masked_patches, K]
+            "masked_patch_after_head": global_masked_patch_after_head,
+            # [n_masked_patches, D]
+            "masked_patch_pre_head": masked_patches_pre_head,
         }
         local_out = {
-            "cls_pre_head": l_cls.unflatten(0, [n_local_crops, B]),  # [n_local_crops, B, D]
-            "reg_pre_head": l_reg.unflatten(0, [n_local_crops, B]),  # [n_local_crops, B, R, D]
-            "patch_pre_head": l_patch.unflatten(0, [n_local_crops, B]),  # [n_local_crops, B, P, D]
-            "cls_after_head": buffer[1].unflatten(0, [n_local_crops, B]),  # [n_local_crops, B, K],
+            # [n_local_crops, B, D]
+            "cls_pre_head": l_cls.unflatten(0, [n_local_crops, B]),
+            # [n_local_crops, B, R, D]
+            "reg_pre_head": l_reg.unflatten(0, [n_local_crops, B]),
+            # [n_local_crops, B, P, D]
+            "patch_pre_head": l_patch.unflatten(0, [n_local_crops, B]),
+            # [n_local_crops, B, K],
+            "cls_after_head": buffer[1].unflatten(0, [n_local_crops, B]),
         }
 
         return global_out, local_out
@@ -595,11 +678,14 @@ class SSLMetaArch(nn.Module):
 
         # Loss scales like in DINOv2, these are multiplied with the loss weights from the config
         dino_global_terms = (
-            n_global_crops * (n_global_crops - 1) if self.dino_global_ignore_diagonal else n_global_crops**2
+            n_global_crops *
+            (n_global_crops - 1) if self.dino_global_ignore_diagonal else n_global_crops**2
         )
         dino_local_terms = n_global_crops * n_local_crops
-        dino_global_scale = dino_global_terms / (dino_global_terms + dino_local_terms)
-        dino_local_scale = dino_local_terms / (dino_global_terms + dino_local_terms)
+        dino_global_scale = dino_global_terms / \
+            (dino_global_terms + dino_local_terms)
+        dino_local_scale = dino_local_terms / \
+            (dino_global_terms + dino_local_terms)
         koleo_scale = n_global_crops
 
         # DINO local loss: compare post-head CLS tokens: student(local crops) vs. teacher(global crops)
@@ -616,7 +702,8 @@ class SSLMetaArch(nn.Module):
             local_weight = 1.0
 
         loss_dict["dino_local_loss_weight"] = local_weight
-        loss_accumulator += self.dino_loss_weight * dino_local_scale * local_weight * dino_local_crops_loss
+        loss_accumulator += self.dino_loss_weight * \
+            dino_local_scale * local_weight * dino_local_crops_loss
 
         # DINO global loss: compare post-head CLS tokens: student(global crops) vs. teacher(global crops)
         dino_global_crops_loss = self.dino_loss(
@@ -625,10 +712,12 @@ class SSLMetaArch(nn.Module):
             ignore_diagonal=self.dino_global_ignore_diagonal,
         )
         loss_dict["dino_global_crops_loss"] = dino_global_crops_loss
-        loss_accumulator += self.dino_loss_weight * dino_global_scale * dino_global_crops_loss
+        loss_accumulator += self.dino_loss_weight * \
+            dino_global_scale * dino_global_crops_loss
 
         # Koleo: regularize pre-head CLS tokens of student(global crops)
-        koleo_loss = sum(self.koleo_loss(x) for x in student_global["cls_pre_head"]) / n_global_crops
+        koleo_loss = sum(self.koleo_loss(x)
+                         for x in student_global["cls_pre_head"]) / n_global_crops
         loss_dict["koleo_loss"] = koleo_loss
         loss_accumulator += self.dino_koleo_loss_weight * koleo_scale * koleo_loss
 
@@ -718,7 +807,8 @@ class SSLMetaArch(nn.Module):
             student_param_list, teacher_param_list = self.ema_params_lists
         with torch.no_grad():
             torch._foreach_mul_(teacher_param_list, m)
-            torch._foreach_add_(teacher_param_list, student_param_list, alpha=1 - m)
+            torch._foreach_add_(teacher_param_list,
+                                student_param_list, alpha=1 - m)
 
     def update_gram(self, m=0):
         if not self.has_gram_teacher:
@@ -731,13 +821,15 @@ class SSLMetaArch(nn.Module):
                 for mgt, mt in zip(self.gram_teacher[k].parameters(), self.teacher[k].parameters()):
                     gramteacher_param_list += [mgt]
                     teacher_param_list += [mt]
-            self.gram_params_lists = (gramteacher_param_list, teacher_param_list)
+            self.gram_params_lists = (
+                gramteacher_param_list, teacher_param_list)
         else:
             gramteacher_param_list, teacher_param_list = self.gram_params_lists
 
         with torch.no_grad():
             torch._foreach_mul_(gramteacher_param_list, m)
-            torch._foreach_add_(gramteacher_param_list, teacher_param_list, alpha=1 - m)
+            torch._foreach_add_(gramteacher_param_list,
+                                teacher_param_list, alpha=1 - m)
 
     def build_data_augmentation_dino(self, cfg):
         return DataAugmentationDINO(
@@ -810,6 +902,7 @@ class SSLMetaArch(nn.Module):
         torch.distributed.all_gather(gathered, tensor)
         catted = torch.cat(gathered, dim=over_dim)
         if global_batch_size is not None:
-            catted = catted.narrow(dim=over_dim, start=0, length=global_batch_size)
+            catted = catted.narrow(dim=over_dim, start=0,
+                                   length=global_batch_size)
 
         return catted.chunk(subgroup_size, dim=over_dim)[distributed.get_subgroup_rank()].clone()
