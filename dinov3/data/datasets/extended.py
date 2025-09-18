@@ -5,6 +5,7 @@
 
 from typing import Any, Tuple
 
+import torch
 from torchvision.datasets import VisionDataset
 
 from .decoders import Decoder, ImageDataDecoder, TargetDecoder
@@ -31,7 +32,10 @@ class ExtendedVisionDataset(VisionDataset):
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         try:
             image_data = self.get_image_data(index)
-            image = self.image_decoder(image_data).decode()
+            if isinstance(image_data, torch.Tensor):
+                image = image_data
+            else:
+                image = self.image_decoder(image_data).decode()
         except Exception as e:
             raise RuntimeError(f"can not read image for sample {index}") from e
         target = self.get_target(index)

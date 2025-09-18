@@ -289,10 +289,19 @@ def build_data_loader_from_cfg(
     img_size = cfg.crops.global_crops_size
     patch_size = cfg.student.patch_size
     n_tokens = (img_size // patch_size) ** 2
-    mask_generator = MaskingGenerator(
-        input_size=(img_size // patch_size, img_size // patch_size),
-        max_num_patches=0.5 * img_size // patch_size * img_size // patch_size,
-    )
+
+    if "train3" in cfg["train"]["dataset_path"]:
+        mask_generator = MaskingGenerator(
+            input_size=(img_size // patch_size, img_size //
+                        patch_size, img_size // patch_size),
+            max_num_patches=0.5 * img_size // patch_size *
+            img_size // patch_size * img_size // patch_size,
+        )
+    else:
+        mask_generator = MaskingGenerator(
+            input_size=(img_size // patch_size, img_size // patch_size),
+            max_num_patches=0.5 * img_size // patch_size * img_size // patch_size,
+        )
 
     if cfg.multidistillation.enabled:
         assert cfg.multidistillation.global_batch_size % distributed.get_subgroup_size() == 0
@@ -633,6 +642,7 @@ def main(argv=None):
             output=os.path.join(os.path.abspath(args.output_dir), "nan_logs"),
             name="nan_logger",
         )
+    cfg.compute_precision.param_dtype = "fp32"
     meta_arch = {
         "SSLMetaArch": SSLMetaArch,
         "MultiDistillationMetaArch": MultiDistillationMetaArch,
@@ -646,6 +656,11 @@ def main(argv=None):
     model.prepare_for_distributed_training()
     # Fill all values with `nans` so that we identify
     # non-initialized values
+    cfg.train.num_workers = 0
+    import dinov3.distributed as distributed
+    distributed.get_world_size = lambda: 1
+    distributed.get_process_subgroup = lambda: None
+    distributed.is_subgroup_main_process = lambda: True
     model._apply(
         lambda t: torch.full_like(
             t,

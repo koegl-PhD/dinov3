@@ -22,12 +22,15 @@ def collate_data_and_cast(
     n_local_crops = len(samples_list[0][0]["local_crops"])
 
     collated_global_crops = torch.stack(
-        [s[0]["global_crops"][i] for i in range(n_global_crops) for s in samples_list]
+        [s[0]["global_crops"][i]
+            for i in range(n_global_crops) for s in samples_list]
     )  # [n_global_crops, B, ...]
-    collated_local_crops = torch.stack([s[0]["local_crops"][i] for i in range(n_local_crops) for s in samples_list])
+    collated_local_crops = torch.stack(
+        [s[0]["local_crops"][i] for i in range(n_local_crops) for s in samples_list])
     if "gram_teacher_crops" in samples_list[0][0]:
         collated_gram_teacher_crops = torch.stack(
-            [s[0]["gram_teacher_crops"][i] for i in range(n_global_crops) for s in samples_list]
+            [s[0]["gram_teacher_crops"][i]
+                for i in range(n_global_crops) for s in samples_list]
         )  # [n_global_crops, B, ...]
     else:
         collated_gram_teacher_crops = None
@@ -43,17 +46,31 @@ def collate_data_and_cast(
     probs = torch.linspace(*mask_ratio_tuple, n_samples_masked + 1)
     upperbound = 0
     masks_list = []
-    for i in range(0, n_samples_masked):
-        prob_max = probs[i + 1]
-        mask = torch.BoolTensor(mask_generator(int(N * prob_max)))
-        if random_circular_shift:  # apply le random circular shift to
-            shift_x, shift_y = (
-                random.randint(0, mask.shape[0] - 1),
-                random.randint(0, mask.shape[1] - 1),
-            )
-            mask = torch.roll(mask, (shift_x, shift_y), (0, 1))
-        masks_list.append(mask)
-        upperbound += int(N * prob_max)
+
+    if collated_global_crops.shape[1] == 3:
+        for i in range(0, n_samples_masked):
+            prob_max = probs[i + 1]
+            mask = torch.BoolTensor(mask_generator(int(N * prob_max)))
+            if random_circular_shift:  # apply le random circular shift to
+                shift_x, shift_y = (
+                    random.randint(0, mask.shape[0] - 1),
+                    random.randint(0, mask.shape[1] - 1),
+                )
+                mask = torch.roll(mask, (shift_x, shift_y), (0, 1))
+            masks_list.append(mask)
+            upperbound += int(N * prob_max)
+    else:
+        for i in range(n_samples_masked):
+            prob_max = probs[i + 1]
+            # expected shape [D, H, W]
+            mask = torch.BoolTensor(mask_generator(int(N * prob_max)))
+            if random_circular_shift:
+                sh = random.randint(0, mask.shape[0] - 1)
+                sw = random.randint(0, mask.shape[1] - 1)
+                sd = random.randint(0, mask.shape[2] - 1)
+                mask = torch.roll(mask, shifts=(sh, sw, sd), dims=(0, 1, 2))
+            masks_list.append(mask)
+            upperbound += int(N * prob_max)
     for _ in range(n_samples_masked, B):
         masks_list.append(torch.BoolTensor(mask_generator(0)))
 
@@ -62,7 +79,8 @@ def collate_data_and_cast(
     collated_masks = torch.stack(masks_list).flatten(1)
     mask_indices_list = collated_masks.flatten().nonzero().flatten()
 
-    masks_weight = (1 / collated_masks.sum(-1).clamp(min=1.0)).unsqueeze(-1).expand_as(collated_masks)[collated_masks]
+    masks_weight = (1 / collated_masks.sum(-1).clamp(min=1.0)
+                    ).unsqueeze(-1).expand_as(collated_masks)[collated_masks]
 
     out = {
         "collated_global_crops": collated_global_crops.to(dtype),
@@ -74,7 +92,8 @@ def collate_data_and_cast(
         "n_masked_patches": torch.full((1,), fill_value=mask_indices_list.shape[0], dtype=torch.long),
     }
     if collated_gram_teacher_crops is not None:
-        out["collated_gram_teacher_crops"] = collated_gram_teacher_crops.to(dtype)
+        out["collated_gram_teacher_crops"] = collated_gram_teacher_crops.to(
+            dtype)
     return out
 
 
@@ -83,10 +102,12 @@ def get_batch_subset(collated_data_batch, divide_by):
     old_bs = collated_data_batch["collated_global_crops"].shape[0] // 2
     target_bs = (old_bs + divide_by - 1) // divide_by
     collated_global_crops = (
-        collated_data_batch["collated_global_crops"].unflatten(0, (2, old_bs)).narrow(1, 0, target_bs).flatten(0, 1)
+        collated_data_batch["collated_global_crops"].unflatten(
+            0, (2, old_bs)).narrow(1, 0, target_bs).flatten(0, 1)
     )
     collated_local_crops = (
-        collated_data_batch["collated_local_crops"].unflatten(0, (-1, old_bs)).narrow(1, 0, target_bs).flatten(0, 1)
+        collated_data_batch["collated_local_crops"].unflatten(
+            0, (-1, old_bs)).narrow(1, 0, target_bs).flatten(0, 1)
     )
 
     masks_old_bs = collated_data_batch["collated_masks"].shape[0] // 2
@@ -103,10 +124,12 @@ def get_batch_subset(collated_data_batch, divide_by):
         _unbind = list(collated_data_batch["collated_masks"].unbind(0))
         random.shuffle(_unbind)
         _bind = torch.stack(_unbind, dim=0)
-        collated_masks = _bind.unflatten(0, (2, masks_old_bs)).narrow(1, 0, masks_target_bs).flatten(0, 1)
+        collated_masks = _bind.unflatten(0, (2, masks_old_bs)).narrow(
+            1, 0, masks_target_bs).flatten(0, 1)
         mask_indices_list = collated_masks.flatten().nonzero().flatten()
 
-    masks_weight = (1 / collated_masks.sum(-1).clamp(min=1.0)).unsqueeze(-1).expand_as(collated_masks)[collated_masks]
+    masks_weight = (1 / collated_masks.sum(-1).clamp(min=1.0)
+                    ).unsqueeze(-1).expand_as(collated_masks)[collated_masks]
     upperbound = collated_data_batch["upperbound"]
 
     new_batch = {

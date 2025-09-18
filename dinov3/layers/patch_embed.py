@@ -18,7 +18,86 @@ def make_2tuple(x):
     return (x, x)
 
 
+def make_3tuple(x):
+    if isinstance(x, tuple):
+        assert len(x) == 3
+        return x
+
+    assert isinstance(x, int)
+    return (x, x, x)
+
+
 class PatchEmbed(nn.Module):
+    """
+    2D image to patch embedding: (B,C,H,W) -> (B,N,D)
+
+    Args:
+        img_size: Image size.
+        patch_size: Patch token size.
+        in_chans: Number of input image channels.
+        embed_dim: Number of linear projection output channels.
+        norm_layer: Normalization layer.
+    """
+
+    def __init__(
+        self,
+        img_size: Union[int, Tuple[int, int, int]] = 224,
+        patch_size: Union[int, Tuple[int, int, 16]] = 16,
+        in_chans: int = 3,
+        embed_dim: int = 768,
+        norm_layer: Callable | None = None,
+        flatten_embedding: bool = True,
+    ) -> None:
+        super().__init__()
+
+        image_HW = make_3tuple(img_size)
+        patch_HW = make_3tuple(patch_size)
+        patch_grid_size = (
+            image_HW[0] // patch_HW[0],
+            image_HW[1] // patch_HW[1],
+        )
+
+        self.img_size = image_HW
+        self.patch_size = patch_HW
+        self.patches_resolution = patch_grid_size
+        self.num_patches = patch_grid_size[0] * patch_grid_size[1]
+
+        self.in_chans = in_chans
+        self.embed_dim = embed_dim
+
+        self.flatten_embedding = flatten_embedding
+
+        self.proj = nn.Conv3d(1, embed_dim,
+                              kernel_size=patch_HW, stride=patch_HW)
+        self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
+
+    def forward(self, x: Tensor) -> Tensor:
+        _, H, W, D = x.shape
+
+        x = self.proj(x.unsqueeze(1))  # B D H W
+        H, W, D = x.size(2), x.size(3), x.size(4)
+        x = x.flatten(2).transpose(1, 2)  # B DHW C
+        x = self.norm(x)
+        if not self.flatten_embedding:
+            x = x.reshape(-1, H, W, D, self.embed_dim)  # B D H W C
+        return x
+
+    def flops(self) -> float:
+        Ho, Wo = self.patches_resolution
+        flops = Ho * Wo * self.embed_dim * self.in_chans * \
+            (self.patch_size[0] * self.patch_size[1])
+        if self.norm is not None:
+            flops += Ho * Wo * self.embed_dim
+        return flops
+
+    def reset_parameters(self):
+        k = 1 / (self.in_chans * (self.patch_size[0] ** 2))
+        nn.init.uniform_(self.proj.weight, -math.sqrt(k), math.sqrt(k))
+        if self.proj.bias is not None:
+            nn.init.uniform_(self.proj.bias, -math.sqrt(k), math.sqrt(k))
+
+
+class PatchEmbedo(nn.Module):
     """
     2D image to patch embedding: (B,C,H,W) -> (B,N,D)
 
@@ -58,7 +137,8 @@ class PatchEmbed(nn.Module):
 
         self.flatten_embedding = flatten_embedding
 
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_HW, stride=patch_HW)
+        self.proj = nn.Conv2d(in_chans, embed_dim,
+                              kernel_size=patch_HW, stride=patch_HW)
         self.norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
 
     def forward(self, x: Tensor) -> Tensor:
@@ -77,7 +157,8 @@ class PatchEmbed(nn.Module):
 
     def flops(self) -> float:
         Ho, Wo = self.patches_resolution
-        flops = Ho * Wo * self.embed_dim * self.in_chans * (self.patch_size[0] * self.patch_size[1])
+        flops = Ho * Wo * self.embed_dim * self.in_chans * \
+            (self.patch_size[0] * self.patch_size[1])
         if self.norm is not None:
             flops += Ho * Wo * self.embed_dim
         return flops
